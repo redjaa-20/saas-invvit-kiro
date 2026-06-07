@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  ADMIN
+  USER
+  CLIENT
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum RsvpStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String
+  role          Role      @default(USER)
+  phone         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations for USER role
+  invoices      Invoice[]   @relation("CreatedInvoices")
+  invitations   Invitation[] @relation("CreatedInvitations")
+
+  // Relations for CLIENT role
+  clientInvoices  Invoice[]   @relation("ClientInvoices")
+  clientInvitations Invitation[] @relation("ClientInvitations")
+  rsvpResponses  Rsvp[]
+
+  // User who created this client
+  createdById   String?
+  createdBy     User?     @relation("UserClients", fields: [createdById], references: [id])
+  clients       User[]    @relation("UserClients")
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  amount        Float
+  status        InvoiceStatus @default(PENDING)
+  description   String?
+  dueDate       DateTime?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Created by User
+  userId        String
+  user          User          @relation("CreatedInvoices", fields: [userId], references: [id])
+
+  // For Client
+  clientId      String
+  client        User          @relation("ClientInvoices", fields: [clientId], references: [id])
+
+  // One invoice = one invitation
+  invitation    Invitation?
+}
+
+model Invitation {
+  id              String    @id @default(cuid())
+  
+  // Event Details
+  eventTitle      String
+  groomName       String
+  brideName       String
+  eventDate       DateTime
+  eventTime       String
+  venue           String
+  venueAddress    String?
+  
+  // Additional Info
+  loveStory       String?
+  groomPhoto      String?
+  bridePhoto      String?
+  coverImage      String?
+  musicUrl        String?
+  theme           String    @default("classic")
+  
+  // Status
+  isPublished     Boolean   @default(false)
+  slug            String    @unique
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  invoiceId       String    @unique
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id])
+
+  userId          String
+  user            User      @relation("CreatedInvitations", fields: [userId], references: [id])
+
+  clientId        String
+  client          User      @relation("ClientInvitations", fields: [clientId], references: [id])
+
+  guests          Guest[]
+  rsvps           Rsvp[]
+}
+
+model Guest {
+  id            String    @id @default(cuid())
+  name          String
+  phone         String?
+  email         String?
+  slug          String    @unique
+  createdAt     DateTime  @default(now())
+
+  invitationId  String
+  invitation    Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  rsvp          Rsvp?
+}
+
+model Rsvp {
+  id            String      @id @default(cuid())
+  status        RsvpStatus  @default(PENDING)
+  numberOfGuests Int        @default(1)
+  message       String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  guestId       String      @unique
+  guest         Guest       @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  invitationId  String
+  invitation    Invitation  @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  userId        String?
+  user          User?       @relation(fields: [userId], references: [id])
+}
